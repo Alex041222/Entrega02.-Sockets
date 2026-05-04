@@ -6,63 +6,58 @@ import java.util.Scanner;
 
 public class Cliente {
     public static void main(String[] args) {
-        if (args.length < 2) {
-            System.out.println("Error: Falten arguments (Port i Paraula Clau)");
+        if (args.length < 1) {
+            System.out.println("Error: Falta el paràmetre del Port.");
             return;
         }
-
+        
         int port = Integer.parseInt(args[0]);
-        String paraulaClau = args[1];
+        
+        try (Scanner teclat = new Scanner(System.in)) {
+            System.out.print("Introdueix la teva PARAULA CLAU: ");
+            String paraulaClau = teclat.nextLine().trim();
 
-        System.out.println("PORT_SERVIDOR: " + port);
-        System.out.println("PARAULA_CLAU_CLIENT: \"" + paraulaClau + "\"");
-        System.out.println("> Client chat to port " + port);
+            try (Socket socket = new Socket("127.0.0.1", port)) {
+                PrintWriter sortida = new PrintWriter(socket.getOutputStream(), true);
+                BufferedReader entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-        try (Socket socket = new Socket("127.0.0.1", port);
-             Scanner teclat = new Scanner(System.in)) {
+                // Enviem la clau inicial per identificar-nos al servidor
+                sortida.println(paraulaClau);
 
-            System.out.println("> Inicializing client... OK"); // [cite: 8]
+                while (true) {
+                    // 1. ENVIAR
+                    System.out.print("#Enviar al servidor: ");
+                    String msgEnviar = teclat.nextLine();
+                    sortida.println(msgEnviar);
 
-            PrintWriter sortida = new PrintWriter(socket.getOutputStream(), true);
-            BufferedReader entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                    // Si el client envia la seva pròpia clau, tanca
+                    if (msgEnviar.trim().equalsIgnoreCase(paraulaClau)) {
+                        break;
+                    }
 
-            System.out.println("> Inicializing chat... OK");
-
-            boolean continuar = true;
-            while (continuar) {
-                // El client inicia la conversa enviant [cite: 18, 30]
-                System.out.print("#Enviar al servidor: ");
-                String msgEnviar = teclat.nextLine();
-                sortida.println(msgEnviar);
-
-                if (msgEnviar.contains(paraulaClau)) { // [cite: 13]
-                    continuar = false;
-                } else {
-                    // Rebre resposta del servidor [cite: 31]
+                    // 2. REBRE (Confirmació o resposta)
                     String msgRebut = entrada.readLine();
-
-                    if (msgRebut == null) {
-                        System.out.println("> Connexió perduda.");
-                        continuar = false;
-                    } else {
-                        System.out.println("#Rebut del servidor: " + msgRebut);
-
-                        if (msgRebut.contains(paraulaClau)) { // [cite: 16]
-                            System.out.println("> Server keyword detected!");
-                            continuar = false;
-                        }
+                    
+                    // Si el servidor ens tanca la connexió
+                    if (msgRebut == null) break;
+                    
+                    System.out.println("#Rebut del servidor: " + msgRebut);
+                    
+                    // SI EL SERVIDOR ENS TORNA LA NOSTRA CLAU (senyal de tancament detectat)
+                    if (msgRebut.trim().equalsIgnoreCase(paraulaClau)) {
+                        System.out.println("> Client keyword detected!");
+                        break;
                     }
                 }
+                
+                // Missatges de comiat finals
+                System.out.println("> Closing chat... OK");
+                System.out.println("> Closing client... OK");
+                System.out.println("> Bye!");
+
+            } catch (IOException e) {
+                System.out.println("Error: Connexió perduda o servidor no trobat.");
             }
-
-            // Tancament de recursos [cite: 17]
-            System.out.println("> Closing chat... OK");
-            socket.close();
-            System.out.println("> Closing client... OK");
-            System.out.println("> Bye!");
-
-        } catch (IOException e) {
-            System.out.println("Error: No s'ha pogut connectar al servidor.");
         }
     }
 }
